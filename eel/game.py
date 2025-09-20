@@ -1,4 +1,5 @@
 import pygame
+import random
 from . import config
 
 class Game:
@@ -34,6 +35,11 @@ class Game:
         self.start_delay = 2.0
         self.start_timer = 0.0
         self.game_started = False
+
+        # nourriture
+        self.food_x = 0
+        self.food_y = 0
+        self.generate_food()
 
     def run(self):
         while self.running:
@@ -121,8 +127,17 @@ class Game:
             self.grid_y = start_y + (self.target_grid_y - start_y) * progress
                 
     # Empêcher les demi-tours
-    def is_valid_direction_change(self, new_direction):        
+    def is_valid_direction_change(self, new_direction):
         return new_direction != -self.auto_direction
+
+    def generate_food(self):
+        # Générer une position aléatoire pour la nourriture
+        self.food_x = random.randint(0, 10)
+        self.food_y = random.randint(0, 10)
+
+        # S'assurer que la nourriture n'apparaît pas sur le joueur
+        if self.food_x == 5 and self.food_y == 5:
+            self.generate_food()
 
     def get_pixel_position(self):
         # Convertir position grille en pixels
@@ -135,6 +150,12 @@ class Game:
     def draw(self):
         self.screen.fill(config.BG_COLOR)  # Efface l'écran avec la couleur de fond
         self.grid(config.CELL_SIZE)        # Dessine une grille centrée
+
+        # Dessiner la nourriture
+        if hasattr(self, 'grid_bounds'):
+            food_pixel_x = self.grid_bounds.left + (self.food_x * config.CELL_SIZE) + (config.CELL_SIZE // 2)
+            food_pixel_y = self.grid_bounds.top + (self.food_y * config.CELL_SIZE) + (config.CELL_SIZE // 2)
+            pygame.draw.circle(self.screen, "red", (food_pixel_x, food_pixel_y), 8)  # Petit cercle rouge
 
         # Dessiner l'anguille à sa position interpolée
         pixel_pos = self.get_pixel_position()
