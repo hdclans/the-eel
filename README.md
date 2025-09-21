@@ -1,8 +1,31 @@
 # the-eel
 
-Jeu Snake en Python avec Pygame, inspiré du Snake Google.
+Jeu Snake simple en Python avec Pygame, inspiré du Snake Google.
+
+**Note:** Première version fonctionnelle réalisée en Python. En raison de complications pour la mise en ligne, une migration vers JavaScript est prévue dans un autre repository.
+
+## Fonctionnalités
+- Jeu Snake fonctionnel
+- Différentes vitesses de jeu
+- Interface simple et intuitive
+
+## Prérequis
+- Python 3.7 ou supérieur
+- pip (gestionnaire de packages Python)
 
 ## Installation
+
+1. Cloner le repository
+```bash
+git clone https://github.com/hdclans/the-eel.git
+cd the-eel
+```
+
+2. Installer Python (si pas déjà installé)
+   - Télécharger depuis https://python.org
+   - Ou via gestionnaire de packages selon votre OS
+
+3. Installer les dépendances
 ```bash
 pip install -r requirements.txt
 ```

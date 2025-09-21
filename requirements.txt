@@ -1,8 +1,8 @@
 # Bibliothèque principale
 pygame==2.6.1
 
-# (Optionnel) Pour générer des nombres aléatoires plus avancés
+# Pour générer des nombres aléatoires plus avancés
 numpy==2.1.0
 
-# (Optionnel) Pour faciliter les tests unitaires
+# Pour faciliter les tests unitaires
 pytest==8.3.3
