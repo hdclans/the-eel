@@ -2,7 +2,7 @@ import pygame
 from . import config
 
 
-class Snake:
+class Eel:
     """Classe représentant l'anguille"""
 
     def __init__(self, start_x=5, start_y=5):

@@ -1,12 +1,12 @@
 import pygame
 from . import config
-from .snake import Snake
+from .eel import Eel
 from .food import Food
 from .grid import Grid
 
 
 class Game:
-    """Classe principale du jeu Snake/Eel"""
+    """Classe principale"""
 
     def __init__(self):
         pygame.init()
@@ -25,7 +25,7 @@ class Game:
         )
 
         # Composants du jeu
-        self.snake = Snake(5, 5)
+        self.eel = Eel(5, 5)
         self.food = Food()
         self.grid = Grid(self.center)
 
@@ -35,7 +35,7 @@ class Game:
         self.game_started = False
 
         # Initialiser la nourriture en évitant l'anguille
-        self.food.generate([self.snake.get_head_position()])
+        self.food.generate([self.eel.get_head_position()])
 
     def run(self):
         while self.running:
@@ -57,13 +57,13 @@ class Game:
         # Gestion des entrées clavier pour l'anguille
         keys = pygame.key.get_pressed()
         if keys[pygame.K_z] or keys[pygame.K_UP]:
-            self.snake.set_pending_direction(pygame.Vector2(0, -1))
+            self.eel.set_pending_direction(pygame.Vector2(0, -1))
         elif keys[pygame.K_s] or keys[pygame.K_DOWN]:
-            self.snake.set_pending_direction(pygame.Vector2(0, 1))
+            self.eel.set_pending_direction(pygame.Vector2(0, 1))
         elif keys[pygame.K_q] or keys[pygame.K_LEFT]:
-            self.snake.set_pending_direction(pygame.Vector2(-1, 0))
+            self.eel.set_pending_direction(pygame.Vector2(-1, 0))
         elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-            self.snake.set_pending_direction(pygame.Vector2(1, 0))
+            self.eel.set_pending_direction(pygame.Vector2(1, 0))
 
     def update(self):
         """Mettre à jour la logique du jeu"""
@@ -75,7 +75,7 @@ class Game:
             return
 
         # Mise à jour de l'anguille
-        self.snake.update_movement(self.dt)
+        self.eel.update_movement(self.dt)
 
         # Vérifier les collisions
         self._check_collisions()
@@ -83,25 +83,25 @@ class Game:
     def _check_collisions(self):
         """Vérifier toutes les collisions"""
         # Collision avec les limites
-        if self.snake.is_out_of_bounds():
+        if self.eel.is_out_of_bounds():
             print(f"Game Over: Sortie de grille")
             self.running = False
             return
 
         # Collision avec soi-même
-        if self.snake.check_self_collision():
+        if self.eel.check_self_collision():
             print("Game Over: Collision avec soi-même")
             self.running = False
             return
 
         # Collision avec la nourriture
-        head_pos = self.snake.get_head_position()
+        head_pos = self.eel.get_head_position()
         food_pos = self.food.get_position()
 
         if head_pos == food_pos:
-            self.snake.add_segment()
+            self.eel.add_segment()
             # Régénérer la nourriture en évitant l'anguille'
-            avoid_positions = [head_pos] + [tuple(map(int, segment)) for segment in self.snake.body]
+            avoid_positions = [head_pos] + [tuple(map(int, segment)) for segment in self.eel.body]
             self.food.generate(avoid_positions)
 
     def draw(self):
@@ -118,6 +118,6 @@ class Game:
         self.food.draw(self.screen, grid_bounds)
 
         # Dessiner l'anguille'
-        self.snake.draw(self.screen, grid_bounds)
+        self.eel.draw(self.screen, grid_bounds)
 
         pygame.display.flip()
