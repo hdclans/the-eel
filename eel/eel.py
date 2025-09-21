@@ -17,10 +17,14 @@ class Eel:
         self.pending_direction = None
         self.move_timer = 0
         self.first_move = True
+        self.body_delay = 0.05
+        self.body_move_timer = 0
 
         # Corps de l'anguille
         self.body = []
         self.body_history = []
+        self.initial_segments_to_add = 3
+        self.segments_added = 0
 
     def add_segment(self):
         """Ajouter un nouveau segment au corps"""
@@ -35,13 +39,21 @@ class Eel:
     def update_movement(self, dt):
         """Mettre à jour le mouvement de l'anguille"""
         self.move_timer += dt
+        self.body_move_timer += dt
 
         # Ajouter position actuelle à l'historique
-        self.body_history.append((self.grid_x, self.grid_y))
+        if self.body_move_timer >= self.body_delay:
+            self.body_history.append((self.grid_x, self.grid_y))
+
+        # Ajouter progressivement les segments initiaux
+        if self.segments_added < self.initial_segments_to_add and self.body_move_timer >= self.body_delay:
+            if len(self.body_history) >= (self.segments_added + 1) * int(config.MOVE_INTERVAL * config.FPS):
+                self.add_segment()
+                self.segments_added += 1
 
         # Changement de direction et mouvement synchronisés
         if self.move_timer >= config.MOVE_INTERVAL:
-            self.move_timer = 0
+            self.move_timer -= config.MOVE_INTERVAL
 
             # Appliquer changement de direction si valide
             if self.pending_direction and self._is_valid_direction_change(self.pending_direction):
