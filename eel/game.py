@@ -39,6 +39,16 @@ class Game:
 
         # État du jeu
         self.game_over = False
+        self.in_menu = True
+        self.selected_speed = config.SPEED_NORMAL
+
+        # Boutons du menu
+        self.play_button_rect = pygame.Rect(config.SCREEN_WIDTH // 2 - 100, config.SCREEN_HEIGHT // 2 + 100, 200, 50)
+        self.speed_slow_rect = pygame.Rect(config.SCREEN_WIDTH // 2 - 210, config.SCREEN_HEIGHT // 2 - 50, 130, 60)
+        self.speed_normal_rect = pygame.Rect(config.SCREEN_WIDTH // 2 - 65, config.SCREEN_HEIGHT // 2 - 50, 130, 60)
+        self.speed_fast_rect = pygame.Rect(config.SCREEN_WIDTH // 2 + 80, config.SCREEN_HEIGHT // 2 - 50, 130, 60)
+
+        # Bouton restart
         self.restart_button_rect = pygame.Rect(config.SCREEN_WIDTH // 2 - 100, config.SCREEN_HEIGHT // 2 + 50, 200, 50)
 
         # Initialiser la nourriture en évitant l'anguille
@@ -61,11 +71,13 @@ class Game:
             if event.type == pygame.QUIT:
                 self.running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if self.game_over and self.restart_button_rect.collidepoint(event.pos):
+                if self.in_menu:
+                    self._handle_menu_clicks(event.pos)
+                elif self.game_over and self.restart_button_rect.collidepoint(event.pos):
                     self.restart_game()
 
         # Gestion des entrées clavier pour l'anguille
-        if not self.game_over:
+        if not self.game_over and not self.in_menu:
             keys = pygame.key.get_pressed()
             if keys[pygame.K_z] or keys[pygame.K_UP]:
                 if not self.game_started:
@@ -94,7 +106,7 @@ class Game:
     def update(self):
         """Mettre à jour la logique du jeu"""
         # attendre le premier clic de flèche
-        if not self.game_started or self.game_over:
+        if self.in_menu or not self.game_started or self.game_over:
             return
 
         # Mise à jour de l'anguille
@@ -131,6 +143,7 @@ class Game:
         """Dessiner tous les éléments du jeu"""
         self.screen.fill(config.BG_COLOR)
 
+        # Toujours dessiner le jeu en arrière-plan
         self.grid.draw(self.screen, config.CELL_SIZE)
 
         # Obtenir les limites de la grille
@@ -140,9 +153,13 @@ class Game:
 
         self.eel.draw(self.screen, grid_bounds)
 
-        self._draw_score()
+        if not self.in_menu:
+            self._draw_score()
 
-        if self.game_over:
+        # Dessiner les overlays
+        if self.in_menu:
+            self._draw_menu()
+        elif self.game_over:
             self._draw_game_over()
 
         pygame.display.flip()
@@ -180,6 +197,68 @@ class Game:
         restart_text = self.font.render("RESTART", True, "white")
         restart_rect = restart_text.get_rect(center=self.restart_button_rect.center)
         self.screen.blit(restart_text, restart_rect)
+
+    def _draw_menu(self):
+        """Dessiner le menu principal"""
+        # Fond semi-transparent
+        overlay = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+        overlay.set_alpha(160)
+        overlay.fill("black")
+        self.screen.blit(overlay, (0, 0))
+
+        # Titre
+        title_text = self.font.render("THE EEL", True, "white")
+        title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2 - 150))
+        self.screen.blit(title_text, title_rect)
+
+        # Label vitesse
+        speed_label = self.font.render("Speed:", True, "white")
+        speed_label_rect = speed_label.get_rect(center=(config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2 - 100))
+        self.screen.blit(speed_label, speed_label_rect)
+
+        # Boutons de vitesse
+        speeds = [
+            (self.speed_slow_rect, "SLOW", config.SPEED_SLOW),
+            (self.speed_normal_rect, "NORMAL", config.SPEED_NORMAL),
+            (self.speed_fast_rect, "FAST", config.SPEED_FAST)
+        ]
+
+        for rect, text, speed in speeds:
+            color = "green" if speed == self.selected_speed else "darkgray"
+            border_color = "white" if speed == self.selected_speed else "gray"
+
+            pygame.draw.rect(self.screen, color, rect)
+            pygame.draw.rect(self.screen, border_color, rect, 2)
+
+            speed_text = self.font.render(text, True, "white")
+            text_rect = speed_text.get_rect(center=rect.center)
+            self.screen.blit(speed_text, text_rect)
+
+        # Bouton PLAY
+        pygame.draw.rect(self.screen, "darkgreen", self.play_button_rect)
+        pygame.draw.rect(self.screen, "white", self.play_button_rect, 3)
+        play_text = self.font.render("PLAY", True, "white")
+        play_rect = play_text.get_rect(center=self.play_button_rect.center)
+        self.screen.blit(play_text, play_rect)
+
+    def _handle_menu_clicks(self, pos):
+        """Gérer les clics dans le menu"""
+        if self.speed_slow_rect.collidepoint(pos):
+            self.selected_speed = config.SPEED_SLOW
+        elif self.speed_normal_rect.collidepoint(pos):
+            self.selected_speed = config.SPEED_NORMAL
+        elif self.speed_fast_rect.collidepoint(pos):
+            self.selected_speed = config.SPEED_FAST
+        elif self.play_button_rect.collidepoint(pos):
+            self.start_game()
+
+    def start_game(self):
+        """Démarrer le jeu avec la vitesse sélectionnée"""
+        self.in_menu = False
+        config.MOVE_INTERVAL = self.selected_speed
+        self.eel = Eel(5, 5)
+        self.food = Food()
+        self.food.generate([self.eel.get_head_position()])
 
     def restart_game(self):
         """Redémarrer le jeu"""

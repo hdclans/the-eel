@@ -8,8 +8,13 @@ PLAYER_COLOR = "darkgreen"
 
 # Joueur
 PLAYER_RADIUS = 25
-PLAYER_SPEED = 55 * 10 / 3  # pixels par seconde (55 pixels en 0.3s)
-MOVE_INTERVAL = 3 / 10
+PLAYER_SPEED = 55 * 10 / 2  # pixels par seconde (55 pixels en 0.2s)
+MOVE_INTERVAL = 2 / 10
+
+# Vitesses de jeu
+SPEED_SLOW = 3 / 10      # 0.3s
+SPEED_NORMAL = 2 / 10    # 0.2s
+SPEED_FAST = 1 / 10      # 0.1s
 
 # FPS
 FPS = 60
