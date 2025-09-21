@@ -3,6 +3,8 @@ from . import config
 from .eel import Eel
 from .food import Food
 from .grid import Grid
+from .menu import Menu
+from .game_state import GameStateManager
 
 
 class Game:
@@ -27,31 +29,18 @@ class Game:
             self.screen.get_height() / 2
         )
 
+        # Gestionnaires
+        self.state_manager = GameStateManager()
+        self.menu = Menu(self.screen, self.font)
+
         # Composants du jeu
+        self._init_game_components()
+
+    def _init_game_components(self):
+        """Initialiser les composants de jeu"""
         self.eel = Eel(5, 5)
         self.food = Food()
         self.grid = Grid(self.center)
-
-        # Délai de démarrage
-        self.start_delay = 2.0
-        self.start_timer = 0.0
-        self.game_started = False
-
-        # État du jeu
-        self.game_over = False
-        self.in_menu = True
-        self.selected_speed = config.SPEED_NORMAL
-
-        # Boutons du menu
-        self.play_button_rect = pygame.Rect(config.SCREEN_WIDTH // 2 - 100, config.SCREEN_HEIGHT // 2 + 100, 200, 50)
-        self.speed_slow_rect = pygame.Rect(config.SCREEN_WIDTH // 2 - 210, config.SCREEN_HEIGHT // 2 - 50, 130, 60)
-        self.speed_normal_rect = pygame.Rect(config.SCREEN_WIDTH // 2 - 65, config.SCREEN_HEIGHT // 2 - 50, 130, 60)
-        self.speed_fast_rect = pygame.Rect(config.SCREEN_WIDTH // 2 + 80, config.SCREEN_HEIGHT // 2 - 50, 130, 60)
-
-        # Bouton restart
-        self.restart_button_rect = pygame.Rect(config.SCREEN_WIDTH // 2 - 100, config.SCREEN_HEIGHT // 2 + 50, 200, 50)
-
-        # Initialiser la nourriture en évitant l'anguille
         self.food.generate([self.eel.get_head_position()])
 
     def run(self):
@@ -71,42 +60,16 @@ class Game:
             if event.type == pygame.QUIT:
                 self.running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if self.in_menu:
-                    self._handle_menu_clicks(event.pos)
-                elif self.game_over and self.restart_button_rect.collidepoint(event.pos):
-                    self.restart_game()
+                self._handle_mouse_click(event.pos)
 
         # Gestion des entrées clavier pour l'anguille
-        if not self.game_over and not self.in_menu:
+        if self.state_manager.is_waiting_start or self.state_manager.is_playing:
             keys = pygame.key.get_pressed()
-            if keys[pygame.K_z] or keys[pygame.K_UP]:
-                if not self.game_started:
-                    self.game_started = True
-                    self.eel.start_movement(pygame.Vector2(0, -1))  # Démarrer vers le haut
-                else:
-                    self.eel.set_pending_direction(pygame.Vector2(0, -1))
-            elif keys[pygame.K_s] or keys[pygame.K_DOWN]:
-                if not self.game_started:
-                    self.game_started = True
-                    self.eel.start_movement(pygame.Vector2(0, 1))   # Démarrer vers le bas
-                else:
-                    self.eel.set_pending_direction(pygame.Vector2(0, 1))
-            elif keys[pygame.K_q] or keys[pygame.K_LEFT]:
-                if not self.game_started:
-                    pass
-                else:
-                    self.eel.set_pending_direction(pygame.Vector2(-1, 0))
-            elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-                if not self.game_started:
-                    self.game_started = True
-                    self.eel.start_movement(pygame.Vector2(1, 0))   # Démarrer vers la droite
-                else:
-                    self.eel.set_pending_direction(pygame.Vector2(1, 0))
+            self._handle_keyboard_input(keys)
 
     def update(self):
         """Mettre à jour la logique du jeu"""
-        # attendre le premier clic de flèche
-        if self.in_menu or not self.game_started or self.game_over:
+        if not self.state_manager.should_update_game():
             return
 
         # Mise à jour de l'anguille
@@ -120,13 +83,13 @@ class Game:
         # Collision avec les limites
         if self.eel.is_out_of_bounds():
             print(f"Game Over: Sortie de grille")
-            self.game_over = True
+            self.state_manager.game_over()
             return
 
         # Collision avec soi-même
         if self.eel.check_self_collision():
             print("Game Over: Collision avec soi-même")
-            self.game_over = True
+            self.state_manager.game_over()
             return
 
         # Collision avec la nourriture
@@ -144,25 +107,25 @@ class Game:
         self.screen.fill(config.BG_COLOR)
 
         # Toujours dessiner le jeu en arrière-plan
-        self.grid.draw(self.screen, config.CELL_SIZE)
+        self._draw_game_elements()
 
-        # Obtenir les limites de la grille
-        grid_bounds = self.grid.get_bounds()
-
-        self.food.draw(self.screen, grid_bounds)
-
-        self.eel.draw(self.screen, grid_bounds)
-
-        if not self.in_menu:
+        # Dessiner les overlays selon l'état
+        if self.state_manager.is_menu:
+            self.menu.draw_main_menu()
+        elif self.state_manager.is_game_over:
+            final_score = self._calculate_final_score()
+            self.menu.draw_game_over(final_score)
+        else:
             self._draw_score()
 
-        # Dessiner les overlays
-        if self.in_menu:
-            self._draw_menu()
-        elif self.game_over:
-            self._draw_game_over()
-
         pygame.display.flip()
+
+    def _draw_game_elements(self):
+        """Dessiner les éléments de jeu (grille, anguille, nourriture)"""
+        self.grid.draw(self.screen, config.CELL_SIZE)
+        grid_bounds = self.grid.get_bounds()
+        self.food.draw(self.screen, grid_bounds)
+        self.eel.draw(self.screen, grid_bounds)
 
     def _draw_score(self):
         """Dessiner le score en haut à gauche"""
@@ -173,97 +136,53 @@ class Game:
         score_text = self.font.render(f"Score: {score}", True, "white")
         self.screen.blit(score_text, (20, 20))
 
-    def _draw_game_over(self):
-        """Dessiner l'écran de game over avec bouton restart"""
-        # Fond semi-transparent
-        overlay = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
-        overlay.set_alpha(128)
-        overlay.fill("black")
-        self.screen.blit(overlay, (0, 0))
+    def _calculate_final_score(self):
+        """Calculer le score final"""
+        if self.eel.segments_added >= self.eel.initial_segments_to_add:
+            return len(self.eel.body) - self.eel.initial_segments_to_add
+        return 0
 
-        game_over_text = self.font.render("GAME OVER", True, "white")
-        game_over_rect = game_over_text.get_rect(center=(config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2 - 50))
-        self.screen.blit(game_over_text, game_over_rect)
+    def _handle_mouse_click(self, pos):
+        """Gérer les clics de souris selon l'état"""
+        if self.state_manager.is_menu:
+            action = self.menu.handle_click(pos)
+            if action == "play":
+                self._start_new_game()
+        elif self.state_manager.is_game_over:
+            action = self.menu.handle_game_over_click(pos)
+            if action == "restart":
+                self._restart_game()
 
-        # Score final
-        final_score = len(self.eel.body) - self.eel.initial_segments_to_add if self.eel.segments_added >= self.eel.initial_segments_to_add else 0
-        score_text = self.font.render(f"Final Score: {final_score}", True, "white")
-        score_rect = score_text.get_rect(center=(config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2 - 10))
-        self.screen.blit(score_text, score_rect)
+    def _handle_keyboard_input(self, keys):
+        """Gérer les entrées clavier"""
+        directions = {
+            (pygame.K_z, pygame.K_UP): pygame.Vector2(0, -1),
+            (pygame.K_s, pygame.K_DOWN): pygame.Vector2(0, 1),
+            (pygame.K_q, pygame.K_LEFT): pygame.Vector2(-1, 0),
+            (pygame.K_d, pygame.K_RIGHT): pygame.Vector2(1, 0)
+        }
 
-        # Bouton Restart
-        pygame.draw.rect(self.screen, "darkgreen", self.restart_button_rect)
-        pygame.draw.rect(self.screen, "white", self.restart_button_rect, 2)
-        restart_text = self.font.render("RESTART", True, "white")
-        restart_rect = restart_text.get_rect(center=self.restart_button_rect.center)
-        self.screen.blit(restart_text, restart_rect)
+        for key_pair, direction in directions.items():
+            if any(keys[key] for key in key_pair):
+                if self.state_manager.is_waiting_start:
+                    # Ne pas démarrer vers la gauche
+                    if direction.x == -1:
+                        continue
+                    self.state_manager.begin_playing()
+                    self.eel.start_movement(direction)
+                elif self.state_manager.is_playing:
+                    self.eel.set_pending_direction(direction)
+                break
 
-    def _draw_menu(self):
-        """Dessiner le menu principal"""
-        # Fond semi-transparent
-        overlay = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
-        overlay.set_alpha(160)
-        overlay.fill("black")
-        self.screen.blit(overlay, (0, 0))
+    def _start_new_game(self):
+        """Démarrer une nouvelle partie"""
+        selected_speed = self.menu.get_selected_speed()
+        config.MOVE_INTERVAL = selected_speed
+        self.state_manager.start_game()
+        self._init_game_components()
 
-        # Titre
-        title_text = self.font.render("THE EEL", True, "white")
-        title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2 - 150))
-        self.screen.blit(title_text, title_rect)
-
-        # Label vitesse
-        speed_label = self.font.render("Speed:", True, "white")
-        speed_label_rect = speed_label.get_rect(center=(config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2 - 100))
-        self.screen.blit(speed_label, speed_label_rect)
-
-        # Boutons de vitesse
-        speeds = [
-            (self.speed_slow_rect, "SLOW", config.SPEED_SLOW),
-            (self.speed_normal_rect, "NORMAL", config.SPEED_NORMAL),
-            (self.speed_fast_rect, "FAST", config.SPEED_FAST)
-        ]
-
-        for rect, text, speed in speeds:
-            color = "green" if speed == self.selected_speed else "darkgray"
-            border_color = "white" if speed == self.selected_speed else "gray"
-
-            pygame.draw.rect(self.screen, color, rect)
-            pygame.draw.rect(self.screen, border_color, rect, 2)
-
-            speed_text = self.font.render(text, True, "white")
-            text_rect = speed_text.get_rect(center=rect.center)
-            self.screen.blit(speed_text, text_rect)
-
-        # Bouton PLAY
-        pygame.draw.rect(self.screen, "darkgreen", self.play_button_rect)
-        pygame.draw.rect(self.screen, "white", self.play_button_rect, 3)
-        play_text = self.font.render("PLAY", True, "white")
-        play_rect = play_text.get_rect(center=self.play_button_rect.center)
-        self.screen.blit(play_text, play_rect)
-
-    def _handle_menu_clicks(self, pos):
-        """Gérer les clics dans le menu"""
-        if self.speed_slow_rect.collidepoint(pos):
-            self.selected_speed = config.SPEED_SLOW
-        elif self.speed_normal_rect.collidepoint(pos):
-            self.selected_speed = config.SPEED_NORMAL
-        elif self.speed_fast_rect.collidepoint(pos):
-            self.selected_speed = config.SPEED_FAST
-        elif self.play_button_rect.collidepoint(pos):
-            self.start_game()
-
-    def start_game(self):
-        """Démarrer le jeu avec la vitesse sélectionnée"""
-        self.in_menu = False
-        config.MOVE_INTERVAL = self.selected_speed
-        self.eel = Eel(5, 5)
-        self.food = Food()
-        self.food.generate([self.eel.get_head_position()])
-
-    def restart_game(self):
+    def _restart_game(self):
         """Redémarrer le jeu"""
-        self.game_over = False
-        self.game_started = False
-        self.eel = Eel(5, 5)
-        self.food = Food()
-        self.food.generate([self.eel.get_head_position()])
+        self.state_manager.restart()
+        self._init_game_components()
+
