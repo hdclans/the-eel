@@ -41,6 +41,10 @@ class Game:
         self.food_y = 0
         self.generate_food()
 
+        # Corps de l'anguille (segments qui suivent)
+        self.body = []  # Liste des positions des segments du corps
+        self.body_history = []  # Historique des positions pour que les segments suivent
+
     def run(self):
         while self.running:
             self.handle_events()   # Gestion des événements (clavier, souris, fermeture fenêtre)
@@ -108,7 +112,48 @@ class Game:
 
             # Vérifier les limites de la grille
             if not (0 <= self.target_grid_x < 11 and 0 <= self.target_grid_y < 11):
+                print(f"Game Over: Sortie de grille - Position cible: ({self.target_grid_x}, {self.target_grid_y})")
                 self.running = False
+
+        # Ajouter la position actuelle à l'historique
+        self.body_history.append((self.grid_x, self.grid_y))
+
+        # Vérifier collision avec la nourriture
+        current_grid_x = int(round(self.grid_x))
+        current_grid_y = int(round(self.grid_y))
+        if current_grid_x == self.food_x and current_grid_y == self.food_y:
+            # Ajouter un nouveau segment au corps à une position éloignée
+            positions_per_cell = int(config.MOVE_INTERVAL * config.FPS)
+            new_segment_index = len(self.body) * positions_per_cell + positions_per_cell
+            if len(self.body_history) > new_segment_index:
+                self.body.append((self.body_history[-new_segment_index][0], self.body_history[-new_segment_index][1]))
+            else:
+                # Si pas assez d'historique, placer le segment hors de portée temporairement
+                self.body.append((-10, -10))
+            self.generate_food()
+
+        # Vérifier collision avec le corps de l'anguille seulement quand la tête est proche d'une position entière
+        if abs(self.grid_x - round(self.grid_x)) < 0.1 and abs(self.grid_y - round(self.grid_y)) < 0.1:
+            for i, segment in enumerate(self.body):
+                segment_grid_x = int(round(segment[0]))
+                segment_grid_y = int(round(segment[1]))
+                # Ignorer les segments hors de la grille (segments temporaires)
+                if (0 <= segment_grid_x < 11 and 0 <= segment_grid_y < 11 and
+                    current_grid_x == segment_grid_x and current_grid_y == segment_grid_y):
+                    self.running = False
+
+        # Mettre à jour les positions des segments du corps
+        for i in range(len(self.body)):
+            positions_per_cell = int(config.MOVE_INTERVAL * config.FPS)
+            history_index = len(self.body_history) - 1 - (i + 1) * positions_per_cell
+            if history_index >= 0:
+                self.body[i] = self.body_history[history_index]
+
+        # Limiter la taille de l'historique pour éviter une croissance infinie
+        positions_per_cell = int(config.MOVE_INTERVAL * config.FPS)
+        max_history = len(self.body) * positions_per_cell + 100
+        if len(self.body_history) > max_history:
+            self.body_history = self.body_history[-max_history:]
 
         # Interpolation fluide vers la position cible
         progress = self.move_timer / config.MOVE_INTERVAL
@@ -136,7 +181,10 @@ class Game:
         self.food_y = random.randint(0, 10)
 
         # S'assurer que la nourriture n'apparaît pas sur le joueur
-        if self.food_x == 5 and self.food_y == 5:
+        current_player_x = int(round(self.grid_x))
+        current_player_y = int(round(self.grid_y))
+
+        if self.food_x == current_player_x and self.food_y == current_player_y:
             self.generate_food()
 
     def get_pixel_position(self):
@@ -157,9 +205,16 @@ class Game:
             food_pixel_y = self.grid_bounds.top + (self.food_y * config.CELL_SIZE) + (config.CELL_SIZE // 2)
             pygame.draw.circle(self.screen, "red", (food_pixel_x, food_pixel_y), 8)  # Petit cercle rouge
 
-        # Dessiner l'anguille à sa position interpolée
+        # Dessiner les segments du corps de l'anguille
+        if hasattr(self, 'grid_bounds'):
+            for segment_pos in self.body:
+                segment_pixel_x = self.grid_bounds.left + (segment_pos[0] * config.CELL_SIZE) + (config.CELL_SIZE // 2)
+                segment_pixel_y = self.grid_bounds.top + (segment_pos[1] * config.CELL_SIZE) + (config.CELL_SIZE // 2)
+                pygame.draw.circle(self.screen, config.PLAYER_COLOR, (segment_pixel_x, segment_pixel_y), config.PLAYER_RADIUS)
+
+        # Dessiner la tête de l'anguille à sa position interpolée
         pixel_pos = self.get_pixel_position()
-        pygame.draw.circle(self.screen, config.PLAYER_COLOR, pixel_pos, config.PLAYER_RADIUS) # Dessine l'anguille
+        pygame.draw.circle(self.screen, config.PLAYER_COLOR, pixel_pos, config.PLAYER_RADIUS) # Dessine la tête
         pygame.display.flip()              # Met à jour l'affichage
 
     def grid(self, cell_size):
