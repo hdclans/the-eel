@@ -117,6 +117,12 @@ class Eel:
         """Définir la direction en attente"""
         self.pending_direction = direction
 
+    def start_movement(self, direction):
+        """Démarrer le mouvement - toujours une case à droite puis direction du clic"""
+        if self.first_move:
+            self.auto_direction = pygame.Vector2(1, 0)  # Toujours commencer vers la droite
+            self.pending_direction = direction
+
     def get_head_position(self):
         """Obtenir la position de la tête en coordonnées de grille"""
         return (int(round(self.grid_x)), int(round(self.grid_y)))
